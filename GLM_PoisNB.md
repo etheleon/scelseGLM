@@ -95,7 +95,7 @@ xtable(table(Benthos$Ampeliscidae))
 ```
 
 % latex table generated in R 3.1.1 by xtable 1.7-4 package
-% Tue May  5 01:02:11 2015
+% Tue May  5 01:12:02 2015
 \begin{table}[ht]
 \centering
 \begin{tabular}{rr}
@@ -120,11 +120,6 @@ xtable(table(Benthos$Ampeliscidae))
    \hline
 \end{tabular}
 \end{table}
-
-
-```
-## stat_bin: binwidth defaulted to range/30. Use 'binwidth = x' to adjust this.
-```
 
 ![plot of chunk unnamed-chunk-5](figure/unnamed-chunk-5-1.png) 
 
@@ -201,15 +196,13 @@ pairs(Benthos[, c("OrganicM", "Mud", "Silt", "Clay")])
 cor(Benthos[, c("OrganicM", "Mud", "Silt", "Clay")]) %>% stargazer(type='html')
 ```
 
-```
-## 
-## <table style="text-align:center"><tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"></td><td>OrganicM</td><td>Mud</td><td>Silt</td><td>Clay</td></tr>
-## <tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">OrganicM</td><td>1</td><td>0.061</td><td>0.027</td><td>0.058</td></tr>
-## <tr><td style="text-align:left">Mud</td><td>0.061</td><td>1</td><td>0.658</td><td>0.755</td></tr>
-## <tr><td style="text-align:left">Silt</td><td>0.027</td><td>0.658</td><td>1</td><td>0.002</td></tr>
-## <tr><td style="text-align:left">Clay</td><td>0.058</td><td>0.755</td><td>0.002</td><td>1</td></tr>
-## <tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr></table>
-```
+
+<table style="text-align:center"><tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"></td><td>OrganicM</td><td>Mud</td><td>Silt</td><td>Clay</td></tr>
+<tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">OrganicM</td><td>1</td><td>0.061</td><td>0.027</td><td>0.058</td></tr>
+<tr><td style="text-align:left">Mud</td><td>0.061</td><td>1</td><td>0.658</td><td>0.755</td></tr>
+<tr><td style="text-align:left">Silt</td><td>0.027</td><td>0.658</td><td>1</td><td>0.002</td></tr>
+<tr><td style="text-align:left">Clay</td><td>0.058</td><td>0.755</td><td>0.002</td><td>1</td></tr>
+<tr><td colspan="5" style="border-bottom: 1px solid black"></td></tr></table>
 
 Too much collinearity!
 
@@ -583,7 +576,10 @@ geom_smooth(data = myData,
                 color=fFishing,
                 linetype=fPeriod
                 ), stat = "identity")
+p1
 ```
+
+![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png) 
 
 Cirratulidae (Second Species)
 ====
@@ -594,14 +590,4 @@ Similar data exploration steps
 
 
 #Sketch model fit
-MyData <- expand.grid(fPeriod = levels(Benthos$fPeriod),
-                      fFishing = levels(Benthos$fFishing))
-MyData
 
-P <- predict(M4, newdata = MyData,
-                    type = "link", se = TRUE)
-
-MyData$Fit   <- exp(P$fit) #need to do exponential
-MyData$SeUp  <- exp(P$fit + 2 * P$se.fit)
-MyData$SeLow <- exp(P$fit - 2 * P$se.fit)
-```
