@@ -1,72 +1,65 @@
-## Linear Model
+----
+title: Linear Model
+author: Wesley (Adapted from ziggy)
+---
 
+```{r echo=FALSE}
 #set the working directory & read the data
-setwd("/Users/ziggy/Documents/R/SCELSE")  #enter your path to the data file
+#setwd("/Users/ziggy/Documents/R/SCELSE")  #enter your path to the data file
+```
 
+```{r dataframe}
 #Import the data from a tab delimited ascii file
-Birds <- read.table(file = "loyn.txt",
+Birds <- read.table(file = "data/loyn.txt",
                     header = TRUE,
                     dec = ".")
 #dec = '.'   means that the point is used for decimals.
+```
+## Changes
+1. Switched to using ggplot2
+2. formatted this into a Rmarkdown file.
 
-########################################################################
-# Underlying question and task
-# The variable ABUND is the density of birds in 56 forest patches. 
-# The explanatory variables are size of the forest patches (AREA), 
-# distance to the nearest forest patch (DIST), distance to the 
-# nearest larger forest patch (LDIST), year of isolation of the 
-# patch (YR.ISOL), agricultural grazing intensity at each patch (GRAZE) 
-# and altitude (ALT). The underlying aim of the research is to find 
-# a relationship between bird densities and the explanatory variables. 
- 
-########################################################################
+## Underlying question and task
+
+The variable **ABUND** is the density of birds in 56 forest patches.
+The explanatory variables are size of the forest patches (AREA),
+distance to the nearest forest patch (DIST), distance to the
+nearest larger forest patch (LDIST), year of isolation of the
+patch (YR.ISOL), agricultural grazing intensity at each patch (GRAZE)
+and altitude (ALT). The underlying aim of the research is to find
+a relationship between bird densities and the explanatory variables.
 
 
-#First - Data Exploration (look at the data)
+## Data Exploration
 
-#Install / Load packages from R 
-
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 #install.packages("lattice") #OR in R Studio: Packages -> Install
+library(ggplot2)
+library(gridExtra)
+library(magrittr)
+library(dplyr)
+library(stargazer)
+theme_set(theme_bw())
+#library(lattice)  #For fancy multipanel graphs
+```
 
-library(lattice)  #For fancy multipanel graphs
-
-########################################################################
-#Inspect the file
-#What do we have?
+Inspect the file. What do we have?
+```{r}
 names(Birds)
+str(Birds)
+```
 
-#[1] "Site"    "ABUND"   "AREA"    "DIST"
-#    "LDIST"   "YR.ISOL" "GRAZE"
-#[8] "ALT"
+### Questions to answer in the following
 
-str(Birds)  #Make sure that ABUND and AREA are num  and not factors!!!!!!
-#If they are factors then change the dec argument!
-#'data.frame':   56 obs. of  8 variables:
-# $ Site   : int  1 2 3 4 5 6 7 8 9 10 ...
-# $ ABUND  : num  5.3 2 1.5 17.1 13.8 14.1 3.8 2.2 3.3 3 ...
-# $ AREA   : num  0.1 0.5 0.5 1 1 1 1 1 1 1 ...
-# $ DIST   : int  39 234 104 66 246 234 467 284 156 311 ...
-# $ LDIST  : int  39 234 311 66 246 285 467 1829 156 571 ...
-# $ YR.ISOL: int  1968 1920 1900 1966 1918 1965 1955 1920 1965 1900 ...
-# $ GRAZE  : int  2 5 5 3 5 3 5 5 4 5 ...
-# $ ALT    : int  160 60 140 160 140 130 90 60 130 130 ...
-########################################################################
+1. Outliers in Y / Outliers in X
+2. Collinearity X
+3. Relationships Y vs X
+4. Spatial/temporal aspects of sampling design (not relevant here)
+5. Interactions (is the quality of the data good enough to include them?)
+6. Zero inflation Y
+7. Are categorical covariates balanced?
 
-
-
-########################################################################
-#Data exploration
-#A Outliers in Y / Outliers in X
-#B Collinearity X
-#C Relationships Y vs X
-#D Spatial/temporal aspects of sampling design (not relevant here)
-#E Interactions (is the quality of the data good enough to include them?)
-#F Zero inflation Y
-#G Are categorical covariates balanced?
-
-
-
-###################################################
+```{r echo=TRUE, eval=FALSE}
 #First some elementary R commands.
 #1 How do you acces variables in an object like Birds?
 Birds            #All data
@@ -80,36 +73,31 @@ Birds[1,"ABUND"] #First row of ABUND variable
 Birds[1:10,"ABUND"]  #First 10 rows of ABUND
 c("ABUND", "AREA")   #Two characters concatenated
 Birds[, c("ABUND", "AREA")] #ABUND and AREA variables
-
 MyVar <- c("ABUND", "AREA")  #Same as last two steps
 Birds[, MyVar]
-##################################################
+```
 
-#A Outliers in Y
 
-par(mfrow = c(1, 2))
-boxplot(Birds$ABUND, 
-        main = "Abundance")
-dotchart(Birds$ABUND, 
-         xlab = "Range of data", 
-         ylab = "Values")
-
+#### 1 Outliers in Y
+```{r}
+qplot(x=as.factor(1), y=ABUND, data=Birds, geom=c("boxplot", "jitter"))
 #A Outliers in X
-par(mfrow = c(2, 3), mar = c(4, 3, 3, 2))
-dotchart(Birds$AREA, main = "Area")
-dotchart(Birds$DIST, main = "Distance")
-dotchart(Birds$LDIST, main = "Distance to larger patch")
-dotchart(Birds$YR.ISOL, main = "Year of isloation")
-dotchart(Birds$ALT, main = "Altitude")
-dotchart(Birds$GRAZE, main = "Grazing levels")
+c("AREA", "DIST", "LDIST", "YR.ISOL","ALT", "GRAZE" ) %>%
+lapply(function(colName){
+qplot(factor(1), Birds[,colName], geom="jitter")+xlab(colName)
+                    }) %>%
+do.call(grid.arrange, .)
 
+
+```{r}
 #Apply transformations
-Birds$LOGAREA  <- log10(Birds$AREA)
-Birds$LOGDIST  <- log10(Birds$DIST)
-Birds$LOGLDIST <- log10(Birds$LDIST)
+Birds %<>% mutate(LOGAREA  = log10(AREA))
+Birds %<>% mutate(LOGDIST  = log10(DIST))
+Birds %<>% mutate(LOGLDIST = log10(LDIST))
+```
 
-
-#B Collinearity X
+#### 2 Collinearity X
+```{r collinear}
 pairs(Birds[,c("LOGAREA","LOGDIST","LOGLDIST",
                "YR.ISOL","ALT","GRAZE")])
 
@@ -117,146 +105,169 @@ pairs(Birds[,c("LOGAREA","LOGDIST","LOGLDIST",
 MyVar <- c("LOGAREA","LOGDIST","LOGLDIST",
            "YR.ISOL","ALT","GRAZE")
 pairs(Birds[, MyVar])
+```
 
-
+```{r}
 #How do you detect collinearity between a continuous covariate
 #and a categorical? Make a conditional boxplot
-boxplot(YR.ISOL ~ factor(GRAZE), 
-        data = Birds,
-        ylab = "Year of isolation",
-        xlab = "Grazing intensity")
+p1 = qplot(factor(GRAZE), YR.ISOL, data=Birds, geom=c("boxplot", "jitter"))+
+    labs(   x= "Year of isolation",
+            y= "Grazing intensity")
+p2 = qplot(factor(GRAZE), LOGAREA, data=Birds, geom=c("boxplot", "jitter"))+
+    labs(   x= "Year of isolation",
+            y= "Grazing intensity")
+grid.arrange(p1, p2)
+```
 
-boxplot(LOGAREA ~ factor(GRAZE), 
-        data = Birds)
-
-
-#C. Relationships Y vs X
-MyVar <- c("ABUND","LOGAREA","LOGDIST","LOGLDIST",
+### 3 Relationships Y vs X
+```{r}
+MyVar = c("ABUND","LOGAREA","LOGDIST","LOGLDIST",
            "YR.ISOL","ALT","GRAZE")
 pairs(Birds[, MyVar])
 
-boxplot(ABUND ~ factor(GRAZE), 
-        data = Birds,
-        varwidth = TRUE,
-        ylab = "Bird abundance",
-        xlab = "Grazing levels",
-        main = "Grazing")
+qplot(factor(GRAZE), ABUND, data=Birds, geom=c("boxplot", "jitter"))+labs(
+        y = "Bird abundance",
+        x = "Grazing levels",
+        title = "Grazing")
+```
 
+### 5. Interactions
+```{r}
+p1 = qplot(ABUND, LOGAREA, data=Birds) + facet_wrap(~GRAZE)
+p1
+p1 + stat_smooth(method = "lm", formula = y ~ x, na.rm=T)
+```
 
-#E Interactions
-coplot(ABUND ~ LOGAREA | factor(GRAZE),
-       data = Birds)
-
-coplot(ABUND ~ LOGAREA | factor(GRAZE),
-       data = Birds,
-       panel = function(x, y, ...) {
-         tmp <- lm(y ~ x, na.action = na.omit)
-         abline(tmp)
-         points(x, y) })
-
-
-#F. Zero inflation
+### 6. Zero inflation
+```{r}
 sum(Birds$ABUND == 0)
 100 * sum(Birds$ABUND == 0) / nrow(Birds)
+```
 
+#### 7. Are categorical covariates balanced? Works on Factors only (categorical)
+```{r}
+```{r results='asis', echo=FALSE}
+library(xtable)
+xtable(
+       table(Birds$GRAZE)
+       )
+```
 
-#G. Are categorical covariates balanced? Works on Factors only (categorical)
-table(Birds$GRAZE)
+```{r echo=TRUE}
+M1 = lm(ABUND ~ LOGAREA, data = Birds)
+```
 
+    >??? Shouldnt look at the p-value in this case
+    >Forgot why
+    >when you have 2 covariates (continuous & binomial)
 
-###############################################################################
+##### What is the model that we are fitting?
 
-###############################################################################
-#Analysis
+ ABUND_i = alpha + beta * LOGAREA_i + eps_i
+ eps_i ~ N(0, sigma^2)
+ where i = 1..`r nrow(Birds)`
+ ABUND_i is the abundance at site i
 
-M1 <- lm(ABUND ~ LOGAREA, data = Birds)
+##### What is the fitted model
 
-#What is the model that we are fitting?
-# ABUND_i = alpha + beta * LOGAREA_i + eps_i
-# eps_i ~ N(0, sigma^2)
+ E(ABUND_i) = mu_i = 10.40 + 9.77 * LOGAREA_i 
+ eps ~ N(0,  7.28^2)
 
-# where i = 1,...,56
-# ABUND_i is the abundance at site i
-summary(M1) 
+##### Is everything significant?
 
+```{r echo=FALSE, results='asis'}
+stargazer(M1)
+```
 
-# What is the fitted model
-# E(ABUND_i) = mu_i = 10.40 + 9.77 * LOGAREA_i 
-# eps ~ N(0,  7.28^2)
+ABUND = alpha + beta * LOGAREA + eps
 
+#### Interpretation of F and t values 
 
+H0: beta = 0
+H1: beta <> 0
 
-#Is everything significant?
-summary(M1)
+F_1,54 = 65.38 (p<0.001)
+Or:
+t_n-1    t_55 = 8.08 (p < 0.001)
+Text in paper: A t-value indicated a significant effect (t = 8.08; df = 55, p < 0.001)
 
-#ABUND = alpha + beta * LOGAREA + eps
+### Model validation (independence is most important)
 
-#Interpretation of F and t values 
-#H0: beta = 0
-#H1: beta <> 0
+1. Homogeneity
+2. Independence
 
-#F_1,54 = 65.38 (p<0.001)
-#Or:
-#t_n-1    t_55 = 8.08 (p < 0.001)
-#Text in paper: A t-value indicated a significant effect (t = 8.08; df = 55, p < 0.001)
+#### A Homogeneity
 
+```{r echo=TRUE}
+#ziggy: best to calculate by hand (lme or lmer sometimes include or doesnt include)
 
-################################################
-#Model validation (independence is most important)
-#1. Homogeneity
-#2. Independence
-
-#Homogeneity
-#E1 <- resid(M1)   #or better: 
-E1 <- rstandard(M1) #which are corrected by leverage
+E1 <- resid(M1)
+#Better: corrected by leverage
+E1 <- rstandard(M1) 
 F1 <- fitted(M1)
 
-plot(x = F1, 
-     y = E1, 
+plot(x = F1,
+     y = E1,
      xlab = "Fitted values",
      ylab = "Residuals", 
      main = "Homogeneity?")
 abline(h = 0, v = 0, lty = 2)
+```
 
+#### B Independence
 
-#Independence: Dependence due to model misfit
-#Plot residuals versus covariates
-plot(x = Birds$LOGAREA, 
+Dependence due to model misfit.
+Check by plotting residuals versus covariates
+
+```{r}
+par(mfrow=c(2,2))
+plot(M1)
+```
+
+But plot residuals also versus covariates NOT in the model!!!!!!!
+
+```{r}
+plot(x = Birds$LOGAREA,
      y = E1)
 abline(0,0,lty=2)
 #if you dont see a linear pattern, cannot do linear
+```
 
-
-#But plot residuals also versus covariates NOT in the model!!!!!!!
+```{r}
 boxplot(E1 ~ factor(Birds$GRAZE)) #here there is a grazing effect on residuals - means grazing should have been fitted in model
 abline(h = 0, lty = 2)
 
-plot(y = E1, 
-     x = Birds$YR.ISOL, 
-     col = Birds$GRAZE, 
-     pch =16)
-abline(h = 0, lty = 2)
+qplot(
+     x = YR.ISOL,
+     y = E1, 
+     color = factor(GRAZE),
+     data=Birds
+     )+scale_color_brewer("Graze", type="qual")+xlab("Year")
+
+#abline(h = 0, lty = 2)
+
 # most are OK except YR.ISOL - there is a pattern there, so should be included in model
 # in fact, grazing and years since isolation were colinear (see Ex1)
+```
 
-#and also for all the other covariates!!!
-#...
-#...
+and also for all the other covariates!!!
 
+### Normality
 
-
-#Normality
+```{r}
 hist(E1, main = "Normality", breaks=10)
-#Or qq-plot
+#Or qq-plot aka normality check
 qqnorm(E1)
 #qqline(E1)
+```
 
-
-###############################################################################
 #Plot
 
+```{r predict}
 range(Birds$LOGAREA)
-#-1.000000  3.248219
+```
+
+```{r}
 #Create a data frame that contains x numbers of LOGAREA values
 MyData <- data.frame(LOGAREA = seq(from= -1,
                                    to = 3.25,
@@ -269,36 +280,33 @@ plot(x = Birds$LOGAREA,
      ylab = "Bird abundance")
 
 lines(x = MyData$LOGAREA, 
-      y = P1, 
-      lwd = 3, 
+      y = P1,
+      lwd = 3,
       lty = 1,
       col = 1)
+plotBare= ggplot(Birds, aes(x=ABUND, y=LOGAREA))                       +
+            geom_point()                                               +
+            geom_smooth(method="lm", formula = y ~ I(log(x)), na.rm=T) +
+            labs(
+     x = "Log transformed area",
+     y = "Bird abundance"
+     )
+plotBare + coord_trans(x = "log10")
 
-
-###################################################################
-#Below is some advanced stuff to add confidence bands.
-
+#Base plot Version
 PP1 <- predict(M1, newdata = MyData, se = TRUE, interval = "confidence")
 
 SeConf.Up  <- PP1$fit[,3]
 SeConf.Low <- PP1$fit[,2]
 
-plot(x = Birds$LOGAREA, 
-     y = Birds$ABUND,
-     xlab = "Log transformed area",
-     ylab = "Bird abundance")
+plot(x = Birds$LOGAREA,
+     y = Birds$ABUND)
 
-lines(x = MyData$LOGAREA, 
-      y = PP1$fit[,1], 
-      lwd = 3, 
+lines(x = MyData$LOGAREA,
+      y = PP1$fit[,1],
+      lwd = 3,
       lty = 1,
       col = 1)
-
-
-polygon(c(MyData$LOGAREA, rev(MyData$LOGAREA)),
-        c(SeConf.Low, rev(SeConf.Up)),
-        col = 2, border = NULL,
-        density = 50)
 
 
 #Useful for later...when we have multiple lines
@@ -307,42 +315,64 @@ legend("topleft",
        col = c(1),
        lty = c(1),
        lwd = c(1))
+```
 
+Now, model ABUND as a function of a categorical covariate (factor Graze)
 
-########################################################################
-#Now, model ABUND as a function of a categorical covariate (factor Graze)
-
+```{r}
 M2 <- lm(ABUND ~ factor(GRAZE), data=Birds)
-summary(M2)
+```
+
+```{r results='asis', echo=FALSE}
+summary(M2) %>% stargazer
+```
+
+
+```{r}
+#do.call(txtboxplot, sapply(unique(Birds$GRAZE), function(grazeID) filter(Birds, GRAZE ==grazeID)$ABUND,simplify=F))
 anova(M2)
+```
 
+Apply model as a function of all covariates
+But no interactions
 
-
-
-#Apply model as a function of all covariates
-#But no interactions
-
+```{r}
 M3 <- lm(ABUND ~ LOGAREA + LOGDIST + LOGLDIST +
            YR.ISOL + ALT + factor(GRAZE),
          data = Birds)
+```
 
+### Is everything significant?
 
-#
-#Is everything significant?
-summary(M3)
+```{r results='asis', echo=FALSE}
+summary(M3) %>% stargazer
+```
+
+```{r results='asis', echo=FALSE}
 drop1(M3, test = "F")
+```
 
-
-
-#Now, as a function of the interaction between a continuous and a categorical covariate
-M4 <- lm(ABUND ~ LOGAREA * factor(GRAZE), #this is = to LOGAREA + factor(GRAZE) + LOGAREA : factor(GRAZE)
+Now, as a function of the interaction between a continuous and a categorical covariate
+```{r}
+         #this is = to LOGAREA + factor(GRAZE) + LOGAREA : factor(GRAZE)
+M4 <- lm(ABUND ~ LOGAREA * factor(GRAZE), 
          data = Birds)
+```
 
+```{r results='asis', echo=FALSE}
 summary(M4)
-drop1(M4, test = "F") #test for the interaction - if no-significant, remove and test again
+#test for the interaction - if no-significant, remove and test again
+drop1(M4, test = "F") 
+```
 
+```{r results='asis', echo=FALSE}
 M5 <- lm(ABUND ~ LOGAREA + factor(GRAZE), data = Birds)
+```
+
+```{r results='asis', echo=FALSE}
 summary(M5)
+```
+
+```{r results='asis', echo=FALSE}
 drop1(M5, test = "F")
-
-
+```
