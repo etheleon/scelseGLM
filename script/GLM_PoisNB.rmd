@@ -1,164 +1,158 @@
-# GLM Poisson and Negative Binomial (overdispersed Poisson)
+---
+title: GLM Poisson and Negative Binomial (overdispersed Poisson)
+author: Wesley, 
+---
 
-#######################################################################
-#set the working directory & read the data
-#On a Windows computer: adjust blah blah blah
-#setwd("c:/blah blah blah")
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stargazer)
+library(lattice)  
+library(gridExtra)
+theme_set(theme_bw())
+```
 
-#For a Mac:
-setwd("/Users/ziggy/Documents/R/SCELSE")
-
-
+```{r load, echo=FALSE}
 #Import the data from a tab delimited ascii file
-Benthos <- read.table(file = "infauna.txt", 
+Benthos <- read.table(file = "data/infauna.txt", 
                       header = TRUE,
                       dec = ".")
 #dec = '.'   means that the point is used for decimals. 
 #Change to   dec = ","   if required.
-########################################################################
+```
 
+## Basic Exploratory Analysis
 
-
-
-########################################################################
+```{r}
 #To see what is in the object Benthos, type:
 names(Benthos)
 str(Benthos)
+```
 
-#[1] "Period"       "Fishing"      "OrganicM"     "Mud"         
-#[5] "Silt"         "Clay"         "Ampeliscidae" "Cirratulidae"
+## Aim of the analysis:
 
-# 'data.frame':	80 obs. of  8 variables:
- # $ Period      : int  1 1 1 1 1 1 1 1 1 1 ...
- # $ Fishing     : Factor w/ 2 levels "no","yes": 1 1 1 1 1 2 2 2 2 2 ...
- # $ OrganicM    : num  1.16 1.38 1.84 1.62 1.62 2.13 1.78 1.87 1.56 1.15 ...
- # $ Mud         : num  35.3 34.5 38.4 30.7 32.6 ...
- # $ Silt        : num  25.1 21.9 23.5 17.7 23.3 ...
- # $ Clay        : num  10.16 12.52 14.94 12.99 9.27 ...
- # $ Ampeliscidae: int  7 4 7 3 4 2 2 0 2 3 ...
- # $ Cirratulidae: int  29 52 68 43 41 22 11 7 5 4 ...
-##########################################################################
+To model Ampeliscidae as a function of the covariates:
 
+* Period
+* Fishing
+* OrganicM
+* Mud
+* Silt
+* Clay
+with interaction between Fishing and OrganicM.
 
+| Variable | Definition            |
+| ---      | ---                   |
+| Fishing  | Fishing vs no fishing |
+| Period   | Three time periods    |
 
-
-
-########################################################################
-#Aim of the analysis:
-#Model Ampeliscidae as a function of the covariates:  
-#      Period, Fishing, OrganicM, Mud, Silt, Clay,
-#      with interaction between Fishing and OrganicM
-
-#where
-#Fishing:     Fishing vs no fishing
-#Period:      Three time periods
-########################################################################
-
-
-
-
-########################################################################
-#Housekeeping
+```{r Housekeeping}
 #Converting Period and Fishing into factors
 Benthos$fPeriod <- factor(Benthos$Period)
- 
-Benthos$fFishing <- factor(Benthos$Fishing, 
+Benthos$fFishing <- factor(Benthos$Fishing,
                            levels = c("no", "yes"),
                            labels = c("No Fishing", "Fishing"))
-########################################################################
+```
+
+## BASIC DATA EXPLORATION:
+1. Outliers: Y and X
+2. Collinearity X
+3. Relationships  Y vs X    but also interactions
+4. Zero inflation: Make a frequency plot
 
 
+### 1. Are there any outliers?
+  * Outliers in the response variable?
+  * #Outliers in the explanatory variables?
 
+```{r}
+Benthos                                         %>%
+    select(Ampeliscidae, OrganicM, Silt, Clay, Mud) %>%
+    gather(Var, Value)                              %>%
+    ggplot()                           +
+        geom_jitter(aes(factor(1), Value)) +
+        facet_wrap(~Var)
+```
 
-
-########################################################################
-#Housekeeping
-#Load packages from R 
-library(lattice)  
-
-########################################################################
-
-
-
-
-
-
-########################################################################
-#DATA EXPLORATION: 
-#Outliers: Y and X
-#Collinearity X
-#Relationships  Y vs X    but also interactions
-#Zero inflation: Make a frequency plot
-
-
-#Are there any outliers?
-  #Outliers in the response variable?
-  #Outliers in the explanatory variables?
-   
-
-MyVar <- c("Ampeliscidae", "OrganicM", "Silt", "Clay", "Mud")
-
-dotplot(as.matrix(Benthos[,MyVar]), groups=FALSE,
-        strip = strip.custom(bg = 'white',
-        par.strip.text = list(cex = 1.5)),
-        scales = list(x = list(relation = "free", draw = TRUE),
-                      y = list(relation = "free", draw = FALSE)),
-        col=1, cex  =0.5, pch = 16,
-        xlab = list(label = "Value of the variable", cex = 1.5),
-        ylab = list(label = "Order of the data from text file", cex = 1.5))
-
-
-#great because response var ranges till 15 (<20-25), Poisson may be good
+Great because response var ranges till 15 (<20-25), Poisson may be good.
 
 #Numer of zeros in the response variable
-table(Benthos$Ampeliscidae)
-plot(table(Benthos$Ampeliscidae), type = "h")  
-100 * sum(Benthos$Ampeliscidae == 0) / nrow(Benthos) #calculate % of zeros in data
+
+```{r, results='asis'}
+xtable(table(Benthos$Ampeliscidae))
+```
+
+```{r echo=FALSE}
+qplot(Benthos$Ampeliscidae, geom="bar")
+```
+
+Calculate percentage  of zeros in data
+```{r }
+100 * sum(Benthos$Ampeliscidae == 0) / nrow(Benthos)
 #Not a problem
+#???? Why is it not a problem
+```
 
+### What about categorical covariates?
+Do we have a reasonable number of observations per level of a categorical covariate?
 
- 
-#What about categorical covariates?
-#Do we have a reasonable number of observations per level of a categorical covariate?
+```{r}
 with(Benthos, table(fFishing)) #with the object "Benthos", give me a table
-with(Benthos, table(fPeriod))
+```
 
+```{r}
+with(Benthos, table(fPeriod))
+```
+
+```{r}
 with(Benthos, table(fPeriod,fFishing)) #if I was interested in their interaction
 #Nice, more or less balanced design
- 
- 
-#Collinearity
+```
+
+
+### 2. Collinearity
+
+```{r}
 pairs(Benthos[, c("OrganicM", "Mud", "Silt", "Clay")])
-cor(Benthos[, c("OrganicM", "Mud", "Silt", "Clay")]) #gives you a correlation matrix
-#Too much collinearity!
+```
 
-par(mfrow = c(1, 2))
-boxplot(OrganicM ~ fPeriod, 
-        xlab = "Period",
-        data = Benthos, 
-        main = "OrganicM")
-boxplot(OrganicM ~ fFishing, 
-        xlab = "Fishing", 
-        data = Benthos, 
-        main = "OrganicM")
+```{r}
+#gives you a correlation matrix
+cor(Benthos[, c("OrganicM", "Mud", "Silt", "Clay")]) %>% stargazer(type='html')
+```
 
-par(mfrow = c(1, 2))
-boxplot(Mud ~ fPeriod, 
-        xlab = "Period", 
-        data = Benthos, 
-        main = "Mud")
-boxplot(Mud ~ fFishing, 
-        xlab = "Fishing",
-        data = Benthos, 
-        main = "Mud")    #collinearity between Mud and Fishing - wont be able to say if its because of 1 or the other
+Too much collinearity!
 
-par(mfrow = c(1, 2))
-boxplot(Silt ~ fPeriod, data = Benthos, main = "Silt")
-boxplot(Silt ~ fFishing, data = Benthos, main = "Silt")
+```{r}
+df = Benthos                                         %>%
+    select(Ampeliscidae, OrganicM, Silt, Clay, Mud, fPeriod, fFishing) %>%
+    gather(Var, Value, -fFishing, -fPeriod)                             
+```
 
-par(mfrow = c(1, 2))
-boxplot(Clay ~ fPeriod, data = Benthos, main = "Clay")
-boxplot(Clay ~ fFishing, data = Benthos, main = "Clay")
+```{r}
+df %>% ggplot()                           +
+    geom_boxplot(aes(x=fPeriod, y=Value)) +
+    facet_wrap(~Var, scales="free")+ggtitle("Period")
+```
+
+```{r}
+df %>% ggplot()                           +
+    geom_boxplot(aes(x=fFishing, y=Value)) +
+    facet_wrap(~Var, scales="free")+ggtitle("Fishing")
+```
+
+```{r}
+pPeriod = df %>% filter(Var == 'Silt') %>%
+    ggplot()                           +
+    geom_boxplot(aes(x=fPeriod, y=Value))
+
+pFishing = df %>% filter(Var == 'Silt') %>%
+    ggplot()                           +
+    geom_boxplot(aes(x=fFishing, y=Value))
+grid.arrange(pPeriod, pFishing, nrow=1, main="Silt")
+```
+```{r}
 
 
 #Either use mud  or   silt and clay.
@@ -180,9 +174,6 @@ coplot(Ampeliscidae ~ OrganicM | fFishing,
              
 #There is indication for interaction!!
 ################################################### 
-
-
-
 
 
 
@@ -231,9 +222,10 @@ sum(E1^2) / (N - p)
 
 
 summary(M1)
-drop1(M1, test="Chi")
+drop1(M1, test="Chi")   #Testing maximum likelihood, the distributions follow a Chi test
 #Everything significant. Nothing can be droped
 
+#Instead of pvalue you have LRT Likelihood Ratio Test
 
 #Suppose that the interaction is not significant:
 #Mtest <- glm(Ampeliscidae ~ OrganicM + fFishing  + fPeriod, 
@@ -263,6 +255,7 @@ plot(x = F1,
 abline(h = 0, lty = 2)
 
 #Cook's distance: influential obs
+#There's a paper in the email which you can use (not usable with random effects)
 par(mfrow = c(1, 1))
 plot(M1, which = 4)
 
@@ -443,12 +436,11 @@ lines(MyData1$OrganicM, exp(P2$fit - 2*P2$se), lty=2,col=1,lwd=1)
 #etc  etc etc
 
 
-##############################################################
-#Second species: Cirratulidae
-#Similar data exploration steps
+Cirratulidae (Second Species)
+====
+Similar data exploration steps
+
 #Home work: do the data exploration
-
-
 dotchart(Benthos$Cirratulidae)
 
 #Start analysis
@@ -611,40 +603,34 @@ boxplot(E4 ~ fFishing, data = Benthos)
 
 
 #Model interpretation
-summary(M4)
-#Coefficients:
-#                Estimate Std. Error z value Pr(>|z|)
-#(Intercept)       3.3419     0.1666  20.061  < 2e-16 ***
-#fFishingFishing  -0.5609     0.1471  -3.813 0.000137 ***
-#fPeriod2          0.8083     0.1920   4.210 2.56e-05 ***
-#fPeriod3          0.8250     0.1920   4.297 1.73e-05 ***
+M4 %>% stargazer(type='html')
+```
 
-#Theta:  2.471
+```
+Model interpretation:
+ Model:
+ Cirratulidae_i ~ NB(mu_i, 2.471)
+ E(Cirratulidae_i) = mu_i
+ var(Cirratulidae_i) = mu_i + mu_i^2 / 2.471
 
-#Model interpretation:
-# Model:
-# Cirratulidae_i ~ NB(mu_i, 2.471)
-# E(Cirratulidae_i) = mu_i
-# var(Cirratulidae_i) = mu_i + mu_i^2 / 2.471
-#
-# Period 1 & NO_Fishing
-# log(mu_i) = 3.34
+ Period 1 & NO_Fishing
+ log(mu_i) = 3.34
 
-#Period 2& NO_Fishing
-# log(mu_i) = 3.34 +0.81
+Period 2& NO_Fishing
+ log(mu_i) = 3.34 +0.81
 
-#Period 3& NO_Fishing
-# log(mu_i) = 3.34 +0.83
+Period 3& NO_Fishing
+ log(mu_i) = 3.34 +0.83
 
-# Period 1& Fishing
-# log(mu_i) = 3.34 - 0.56
+ Period 1& Fishing
+ log(mu_i) = 3.34 - 0.56
 
-#Period 2& Fishing
-# log(mu_i) = 3.34 - 0.56 + 0.81
+Period 2& Fishing
+ log(mu_i) = 3.34 - 0.56 + 0.81
 
-#Period 3& Fishing
-# log(mu_i) = 3.34 - 0.56 + 0.83
-
+Period 3& Fishing
+ log(mu_i) = 3.34 - 0.56 + 0.83
+````
 
 
 #Sketch model fit
@@ -658,11 +644,4 @@ P <- predict(M4, newdata = MyData,
 MyData$Fit   <- exp(P$fit) #need to do exponential
 MyData$SeUp  <- exp(P$fit + 2 * P$se.fit)
 MyData$SeLow <- exp(P$fit - 2 * P$se.fit)
-
-
-
-
-
-
-
 

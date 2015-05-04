@@ -1,6 +1,7 @@
-----
-title: Linear Model
-author: Wesley (Adapted from ziggy)
+---
+title: "LM"
+author: Wesley GOI, Ezequiel (Ziggy) Marzinelli 
+output: html_document
 ---
 
 ```{r echo=FALSE}
@@ -8,9 +9,9 @@ author: Wesley (Adapted from ziggy)
 #setwd("/Users/ziggy/Documents/R/SCELSE")  #enter your path to the data file
 ```
 
-```{r dataframe}
+```{r dataframe,echo=FALSE}
 #Import the data from a tab delimited ascii file
-Birds <- read.table(file = "data/loyn.txt",
+Birds <- read.table(file = "../data/loyn.txt",
                     header = TRUE,
                     dec = ".")
 #dec = '.'   means that the point is used for decimals.
@@ -81,7 +82,9 @@ Birds[, MyVar]
 #### 1 Outliers in Y
 ```{r}
 qplot(x=as.factor(1), y=ABUND, data=Birds, geom=c("boxplot", "jitter"))
+```
 #A Outliers in X
+```{r}
 c("AREA", "DIST", "LDIST", "YR.ISOL","ALT", "GRAZE" ) %>%
 lapply(function(colName){
 qplot(factor(1), Birds[,colName], geom="jitter")+xlab(colName)
@@ -97,17 +100,16 @@ Birds %<>% mutate(LOGLDIST = log10(LDIST))
 ```
 
 #### 2 Collinearity X
-```{r collinear}
-pairs(Birds[,c("LOGAREA","LOGDIST","LOGLDIST",
-               "YR.ISOL","ALT","GRAZE")])
 
-## Or
+```{r collinear, echo=FALSE}
+#pairs(Birds[,c("LOGAREA","LOGDIST","LOGLDIST","YR.ISOL","ALT","GRAZE")])
+# Or
 MyVar <- c("LOGAREA","LOGDIST","LOGLDIST",
            "YR.ISOL","ALT","GRAZE")
 pairs(Birds[, MyVar])
 ```
 
-```{r}
+```{r echo=FALSE}
 #How do you detect collinearity between a continuous covariate
 #and a categorical? Make a conditional boxplot
 p1 = qplot(factor(GRAZE), YR.ISOL, data=Birds, geom=c("boxplot", "jitter"))+
@@ -119,8 +121,8 @@ p2 = qplot(factor(GRAZE), LOGAREA, data=Birds, geom=c("boxplot", "jitter"))+
 grid.arrange(p1, p2)
 ```
 
-### 3 Relationships Y vs X
-```{r}
+### 3. Investigating relationships bet Y against X
+```{r echo=FALSE}
 MyVar = c("ABUND","LOGAREA","LOGDIST","LOGLDIST",
            "YR.ISOL","ALT","GRAZE")
 pairs(Birds[, MyVar])
@@ -132,10 +134,9 @@ qplot(factor(GRAZE), ABUND, data=Birds, geom=c("boxplot", "jitter"))+labs(
 ```
 
 ### 5. Interactions
-```{r}
-p1 = qplot(ABUND, LOGAREA, data=Birds) + facet_wrap(~GRAZE)
-p1
-p1 + stat_smooth(method = "lm", formula = y ~ x, na.rm=T)
+```{r }
+qplot(ABUND, LOGAREA, data=Birds) + facet_wrap(~GRAZE) + 
+  stat_smooth(method = "lm", formula = y ~ x, na.rm=T)
 ```
 
 ### 6. Zero inflation
@@ -144,8 +145,7 @@ sum(Birds$ABUND == 0)
 100 * sum(Birds$ABUND == 0) / nrow(Birds)
 ```
 
-#### 7. Are categorical covariates balanced? Works on Factors only (categorical)
-```{r}
+### 7. Are categorical covariates balanced? Works on Factors only (categorical)
 ```{r results='asis', echo=FALSE}
 library(xtable)
 xtable(
@@ -157,32 +157,36 @@ xtable(
 M1 = lm(ABUND ~ LOGAREA, data = Birds)
 ```
 
-    >??? Shouldnt look at the p-value in this case
-    >Forgot why
-    >when you have 2 covariates (continuous & binomial)
-
 ##### What is the model that we are fitting?
 
+```
  ABUND_i = alpha + beta * LOGAREA_i + eps_i
  eps_i ~ N(0, sigma^2)
  where i = 1..`r nrow(Birds)`
  ABUND_i is the abundance at site i
-
+```
 ##### What is the fitted model
 
- E(ABUND_i) = mu_i = 10.40 + 9.77 * LOGAREA_i 
- eps ~ N(0,  7.28^2)
+```
+  E(ABUND_i) = mu_i = 10.40 + 9.77 * LOGAREA_i 
+  eps ~ N(0,  7.28^2)
+```
 
 ##### Is everything significant?
 
-```{r echo=FALSE, results='asis'}
-stargazer(M1)
+Summary results from model1
+```
+ABUND = alpha + beta * LOGAREA + eps
 ```
 
-ABUND = alpha + beta * LOGAREA + eps
+```{r results='asis', echo=FALSE}
+stargazer(M1,  type = 'html')
+```
+
 
 #### Interpretation of F and t values 
 
+```
 H0: beta = 0
 H1: beta <> 0
 
@@ -190,6 +194,7 @@ F_1,54 = 65.38 (p<0.001)
 Or:
 t_n-1    t_55 = 8.08 (p < 0.001)
 Text in paper: A t-value indicated a significant effect (t = 8.08; df = 55, p < 0.001)
+```
 
 ### Model validation (independence is most important)
 
@@ -219,7 +224,7 @@ abline(h = 0, v = 0, lty = 2)
 Dependence due to model misfit.
 Check by plotting residuals versus covariates
 
-```{r}
+```{r echo=FALSE}
 par(mfrow=c(2,2))
 plot(M1)
 ```
@@ -227,16 +232,22 @@ plot(M1)
 But plot residuals also versus covariates NOT in the model!!!!!!!
 
 ```{r}
+#if you dont see a linear pattern, cannot do linear
 plot(x = Birds$LOGAREA,
      y = E1)
 abline(0,0,lty=2)
-#if you dont see a linear pattern, cannot do linear
 ```
 
 ```{r}
 boxplot(E1 ~ factor(Birds$GRAZE)) #here there is a grazing effect on residuals - means grazing should have been fitted in model
 abline(h = 0, lty = 2)
+```
 
+Most are OK except YR.ISOL - there is a pattern there, so should be included in model. 
+In fact, grazing and years since isolation were colinear (see Ex1)
+
+```{r}
+#ggplot version
 qplot(
      x = YR.ISOL,
      y = E1, 
@@ -244,10 +255,6 @@ qplot(
      data=Birds
      )+scale_color_brewer("Graze", type="qual")+xlab("Year")
 
-#abline(h = 0, lty = 2)
-
-# most are OK except YR.ISOL - there is a pattern there, so should be included in model
-# in fact, grazing and years since isolation were colinear (see Ex1)
 ```
 
 and also for all the other covariates!!!
@@ -319,22 +326,28 @@ legend("topleft",
 
 Now, model ABUND as a function of a categorical covariate (factor Graze)
 
+### Model2
+
+
 ```{r}
 M2 <- lm(ABUND ~ factor(GRAZE), data=Birds)
 ```
 
-```{r results='asis', echo=FALSE}
-stargazer(M2)
+```{r ,results='asis', echo=FALSE}
+stargazer(M2,  type = 'html')
 ```
 
+Run annova on the model to check how well this model explains the Y in this case ABUND.
 
-```{r}
+```{r, results='asis', echo=FALSE}
 #do.call(txtboxplot, sapply(unique(Birds$GRAZE), function(grazeID) filter(Birds, GRAZE ==grazeID)$ABUND,simplify=F))
-anova(M2)
+anova(M2) %>% stargazer(type='html')
 ```
 
 Apply model as a function of all covariates
 But no interactions
+
+### Model3
 
 ```{r}
 M3 <- lm(ABUND ~ LOGAREA + LOGDIST + LOGLDIST +
@@ -345,34 +358,48 @@ M3 <- lm(ABUND ~ LOGAREA + LOGDIST + LOGLDIST +
 ### Is everything significant?
 
 ```{r results='asis', echo=FALSE}
-stargazer(M3)
+stargazer(M3, type = 'html')
 ```
+
+**We individually drop each of the variables **
 
 ```{r results='asis', echo=FALSE}
-drop1(M3, test = "F")
+drop1(M3, test = "F") %>% stargazer(type='html')
 ```
 
+
+### Model4
 Now, as a function of the interaction between a continuous and a categorical covariate
 ```{r}
-         #this is = to LOGAREA + factor(GRAZE) + LOGAREA : factor(GRAZE)
+#this is = to LOGAREA + factor(GRAZE) + LOGAREA : factor(GRAZE)
 M4 <- lm(ABUND ~ LOGAREA * factor(GRAZE), 
          data = Birds)
 ```
 
 ```{r results='asis', echo=FALSE}
-summary(M4)
+stargazer(M4,  type = 'html')
 #test for the interaction - if no-significant, remove and test again
-drop1(M4, test = "F") 
 ```
+
+**Dropping one var each in M4:**
+
+```{r results='asis', echo=FALSE}
+drop1(M4, test = "F") %>% stargazer(type='html')
+```
+
+
+### Model5
 
 ```{r results='asis', echo=FALSE}
 M5 <- lm(ABUND ~ LOGAREA + factor(GRAZE), data = Birds)
 ```
 
 ```{r results='asis', echo=FALSE}
-summary(M5)
+stargazer(M5,  type = 'html')
 ```
 
+**Dropping one var each in M5**
+
 ```{r results='asis', echo=FALSE}
-drop1(M5, test = "F")
+drop1(M5, test = "F") %>% stargazer(type='html')
 ```
