@@ -367,7 +367,8 @@ myData %>% head
 myData %<>%
     group_by(fPeriod, fFishing) %>%
     do({
-       data.frame(.,Ampeliscidae= predict(M1, newdata= ., type="response", se=TRUE))    #whats the difference between type=link
+       data.frame(.,Ampeliscidae= predict(M1, newdata= ., type="response", se=TRUE))    
+       #whats the difference between type=link, link doesnt transform for you
     })
 ```
 
@@ -389,8 +390,8 @@ geom_smooth(data = myData,
 shinyApp(
        ui =  bootstrapPage(
                 inputPanel(
-                    selectInput(inputId = "period", label = "Period", choices = c(1,2,3), selected=1),
-                    selectInput(inputId = "fishing", label = "Fishing", choices= c("Fishing", "No Fishing"), selected="Fishing")
+                    selectInput(inputId = "period",  label = "Period",  choices = c(1,2,3), selected=1),
+                    selectInput(inputId = "fishing", label = "Fishing", choices = c("Fishing", "No Fishing"), selected="Fishing")
                         ),
                 mainPanel(
                     plotOutput("plot")
@@ -414,4 +415,213 @@ shinyApp(
         }, 
          options = list(height = 800)
 )
+```
+
+Cirratulidae (Second Species)
+====
+
+Similar data exploration steps
+
+```{r eval=FALSE, echo=FALSE}
+#Home work: do the data exploration
+dotchart(Benthos$Cirratulidae)
+
+#Start analysis
+#Fit the model E[Y] = mu = exp(alpha + A + B + A:B + C )
+M1 <- glm(Cirratulidae ~ OrganicM * fFishing + fPeriod,
+          data = Benthos,
+          family = poisson)
+
+#Exactly the same model
+M1 <- glm(Cirratulidae ~ OrganicM + fFishing +
+                         OrganicM : fFishing +
+                         fPeriod,
+          data = Benthos,
+          family = poisson)
+
+#Fit the model
+#What is the model that we are fitting?
+# Cirratulidae_i ~ P(mu_i)
+# E(Cirratulidae_i) = mu_i   and   var(Cirratulidae_i) = mu_i
+#
+#log(mu_i) = alpha + OrganicM_i + fFishing_i +
+#            Period_i + OrganicM_i x fFishing_i
+```
+
+```{r}
+M1 %>% stargazer(type='html')
+```
+
+```{r}
+#Is the model overdispersed?
+E1 <- resid(M1, type = "pearson")
+N  <- nrow(Benthos)
+p  <- length(coef(M1)) 
+sum(E1^2) / (N - p)
+#[1] 17.12971
+#overdispersed
+
+#or
+Overdispersion <- sum(E1^2) / M1$df.res
+Overdispersion
+
+#Why do you have overdispersion
+#A. Outliers                  => Remove them..but subjective
+#B. Missing covariates        => Add them
+#C. Missing interactions      => Add them (coplot)
+#D. Zero inflation            => ZIP/ZINB
+#E. Dependency                => GLMM
+#F. Non-linear relationships  => GAM
+#G. Wrong link function       => Change it
+#H. Variance is bigger than mean => NB
+
+plot(y = E1, x = Benthos$OrganicM)
+100 * sum(Benthos$Cirratulidae == 0)/ nrow(Benthos)
+
+#Apply NB GLM
+library(MASS)
+M2 <- glm.nb(Cirratulidae ~ OrganicM + fFishing +
+                         OrganicM : fFishing +
+                         fPeriod,
+             data = Benthos)
+
+#by default it is the log link
+
+E2 <- resid(M2, type = "pearson")
+Overdispersion <- sum(E2^2) / M2$df.res
+Overdispersion
+
+#If not lucky....overdispersion > 1.5....
+#then:
+#Why do you have overdispersion
+ #A. Outliers                  => Remove them..but subjective
+ #B. Missing covariates        => Add them
+ #C. Missing interactions      => Add them (coplot)
+ #D. Zero inflation            => ZIP/ZINB
+ #E. Dependency                => GLMM
+ #F. Non-linear relationships  => GAM
+ #G. Wrong link function       => Change it
+
+
+
+
+
+#What is the model that we are fitting?
+
+# Cirratulidae_i ~ NB(mu_i, k)
+# E(Cirratulidae_i) = mu_i
+# var(Cirratulidae_i) = mu_i + mu_i^2 / k
+
+#log(mu_i) = alpha + OrganicM_i + fFishing_i +
+#            Period_i + OrganicM_i x fFishing_i
+
+
+print(summary(M2), digits = 2, signif.stars=FALSE)
+drop1(M2, test = "Chi")
+
+#the interaction is no longer significant
+
+M3 <- glm.nb(Cirratulidae ~ OrganicM + fFishing+
+                         fPeriod, link = "log",
+             data =Benthos)
+
+print(summary(M3), digits = 2, signif.stars=FALSE)
+drop1(M3, test = "Chi")
+
+
+#organic material is not significant
+M4 <- glm.nb(Cirratulidae ~ fFishing +
+                         fPeriod, link = "log",
+             data =Benthos)
+
+print(summary(M4), digits = 2, signif.stars=FALSE)
+drop1(M4, test = "Chi")
+
+#both fFishing and fPeriod are significant
+
+#Coefficients:
+#                Estimate Std. Error z value Pr(>|z|)
+#(Intercept)         3.34       0.17    20.1   <2e-16
+#fFishingFishing    -0.56       0.15    -3.8    1e-04
+#fPeriod2            0.81       0.19     4.2    3e-05
+#fPeriod3            0.82       0.19     4.3    2e-05
+
+#NEXT:
+#    Model validation
+#    Model interpretation
+###############################################
+
+
+#Model validation
+par(mfrow = c(2,2))
+plot(M4)
+
+#Or:
+E4 <- resid(M4, type = "pearson")
+F4 <- fitted(M4)
+plot(x = F4, 
+     y = E4,
+     xlab = "Fitted values",
+     ylab = "Residuals")
+
+#Influential observations
+plot(M4, which = c(4))
+
+#or
+par(mfrow=c(1,1))
+plot(cooks.distance(M4),
+     type = "h",
+     ylim=c(0,1))
+abline(h=1)
+
+
+
+#residuals vs covariates
+par(mfrow=c(1,2))
+boxplot(E4 ~ fPeriod, data = Benthos)
+boxplot(E4 ~ fFishing, data = Benthos)
+
+
+#Model interpretation
+M4 %>% stargazer(type='html')
+
+Model interpretation:
+ Model:
+ Cirratulidae_i ~ NB(mu_i, 2.471)
+ E(Cirratulidae_i) = mu_i
+ var(Cirratulidae_i) = mu_i + mu_i^2 / 2.471
+
+ Period 1 & NO_Fishing
+ log(mu_i) = 3.34
+
+Period 2& NO_Fishing
+ log(mu_i) = 3.34 +0.81
+
+Period 3& NO_Fishing
+ log(mu_i) = 3.34 +0.83
+
+ Period 1& Fishing
+ log(mu_i) = 3.34 - 0.56
+
+Period 2& Fishing
+ log(mu_i) = 3.34 - 0.56 + 0.81
+
+Period 3& Fishing
+ log(mu_i) = 3.34 - 0.56 + 0.83
+```
+
+
+#Sketch model fit
+
+```{r eval=FALSE, echo=FALSE}
+MyData <- expand.grid(fPeriod = levels(Benthos$fPeriod),
+                      fFishing = levels(Benthos$fFishing))
+MyData
+
+P <- predict(M4, newdata = MyData,
+                    type = "link", se = TRUE)
+
+MyData$Fit   <- exp(P$fit) #need to do exponential
+MyData$SeUp  <- exp(P$fit + 2 * P$se.fit)
+MyData$SeLow <- exp(P$fit - 2 * P$se.fit)
 ```

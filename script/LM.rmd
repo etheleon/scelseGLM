@@ -249,12 +249,12 @@ In fact, grazing and years since isolation were colinear (see Ex1)
 ```{r}
 #ggplot version
 qplot(
-     x = YR.ISOL,
-     y = E1, 
+     x     = YR.ISOL,
+     y     = E1,
      color = factor(GRAZE),
-     data=Birds
-     )+scale_color_brewer("Graze", type="qual")+xlab("Year")
-
+     data  = Birds
+     ) +
+scale_color_brewer("Graze", type="qual")+xlab("Year")
 ```
 
 and also for all the other covariates!!!

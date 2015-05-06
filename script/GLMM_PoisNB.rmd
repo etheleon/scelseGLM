@@ -1,0 +1,245 @@
+----
+title: Generalied Linear Mixed Models  Family: Poisson (Neg Binomial: High Counts)
+author: Wesley
+----
+
+## Introduction
+
+Mixed Models
+* Models With **Random effects**
+
+Linear Mixed Models(LMM)
+* OLS estimation follows a Normal Distribution
+
+eg. correlation within Clusters
+Story: When you have data clustered by Industrial or Residential
+
+Why random? 
+You have no idea variable is a true variable.
+eg. 
+
+
+```{r}
+library(magrittr)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(lme4)
+library(lattice)  #Needed for multi-panel graphs
+library(lme4)
+theme_set(theme_bw())
+```
+
+```{r}
+KW <- read.table(file = "../data/pollen.txt", h = T, dec = ".") %>% tbl_df
+str(KW)
+```
+
+Original Aim behind the KW dataset:
+To know if differences are due to food or spatial
+
+```{r}
+#Model the number of Dandelion pollen as a function
+#of time, treatment (3 food sources), the interaction between time
+#and treatment, and a hive effect.
+###################################################################
+KW %<>% mutate(fHive = factor(KW$Hive))
+
+
+########################################################
+#Data exploration
+ggplot(KW, aes(Time, Dandelion))                   +
+       geom_line(aes(group=fHive, lty=fHive))      +
+        facet_wrap(~Treatment)                     +
+        xlabs("Time (days)")                       +
+        ylabs("Number of dandelion pollen grains")
+
+
+#######################################################
+#By design of the study use hive as random effect
+#Step 1: Apply a Poisson GLMM
+##############################
+
+M1 <- glmer(Dandelion ~ Time * Treatment + (1|fHive),
+            data = KW,
+            family = poisson)
+print(summary(M1), digits = 2, signif.stars=FALSE)
+
+#Check for overdispersion
+E1 <- resid(M1, type = "pearson")
+N  <- nrow(KW)
+#Parameters
+p  <- length(fixef(M1)) + 1 #number of fixed (1 more component ie. the random effect)
+Overdispersion <- sum(E1^2) / (N - p)   #with overdisp there's type 1 error, ie. effect when there really isnt
+Overdispersion
+
+#Why do we have overdispersion?
+  #A. Outliers?                  ==> Remove them?
+  #B. Missing covariates or interactions?  ==> Go back or..add a latent variable 
+  #C. Zero inflation?            ==> ZIP
+  #D. Large variance?            ==> NB
+  #E. Correlation?               ==> GLMM
+  #F. Non-linear patterns        ==> GAM(M) 
+  #G. Wrong link function        ==> Change it 
+
+
+#Standard steps to address some of these points:
+#
+#Fitted values
+
+```{r}
+```
+
+```{r}
+```
+
+F1 <- fitted(M1)
+
+plot(x = F1,
+     y = E1,
+     xlab = "Fitted values",
+     ylab = "Pearson residuals")
+abline(h = 0)
+#No outliers
+
+#C. Zero inflation
+plot(table(KW$Dandelion),type = "h")
+#No zero inflation!
+
+
+#D. Large variance?
+dotchart(KW$Dandelion)
+#When the count is very HIGH, the variance is very far from the mean
+#Hence, negative binomial distribution!   ###Large range of data
+
+
+#E. Correlation
+#Do we have the spatial position of the hives? No
+
+
+#F. Non-linear patterns   
+#
+plot(x = KW$Time,
+     y = E1)
+abline(h = 0, lty = 2)
+#Could have coded this as categorical, but u add more parameters 
+#but also you get to use a normal distribution
+
+#Too few unique time points for smoothers.  ### Could fit time as factor if non linear pattern
+
+
+#Approach to deal with overdispersion: NB GLMM
+
+#This function is still under development!
+#nb = negative biomial
+M2A <- glmer.nb(Dandelion ~ Time * Treatment + (1|fHive), 
+               data = KW)
+summary(M2A)
+
+stepAIC(M2A)
+drop1(M2A, test = "Chi")  #Doesn't work in my R version
+#Chi test cause you're doing likelihood estimation
+
+
+#Alternativaly...use this:
+#Install glmmADMB: 
+#Go to the web-page: http://glmmadmb.r-forge.r-project.org/
+#Go for the second option in the web-page
+
+
+library(glmmADMB)
+
+M2 <- glmmadmb(Dandelion ~ Time * Treatment + (1|fHive), 
+             #random =~ 1|fHive,              #note that we are using a different package
+             family="nbinom", data=KW)       #and the syntax has changed
+summary(M2)
+
+E2 <- resid(M2, type = "pearson")
+
+#Overdisp from glmm adnb
+p <- 6 + 1 + 1  #6 betas, 1 sigma, 1 k
+Overdispersion2 <-sum(E2^2) / (N - p)
+Overdispersion2
+
+
+
+#Step 2: Is everthing significant?
+summary(M2)
+drop1(M2, test = "Chi")  
+
+1: In extractAIC.glmmadmb(object, scale, k = k, ...) :
+  ignored explicit specification of scale
+2: In extractAIC.glmmadmb(nfit, scale, k = k, ...) :
+  ignored explicit specification of scale
+
+When comparing bet models with and without interactions
+the algo needs to compare models which each uses a different dispersion parameter (k) 
+hence, the p-value is based upon models which are based upon different dispersion parameters
+#Ah...but you need sub-models with the same k!
+                         #Trouble.
+                      ### You are not using the same k in both models, therefore its not just the interaction you are testing
+#Zuur et al. (2012a): If not the same k, then p value slightly wrong                            
+    
+#Drop the interaction                         
+M3 <- glmmadmb(Dandelion ~ Time + Treatment + (1|fHive), 
+             family="nbinom", data=KW)
+summary(M3)
+drop1(M3, test = "Chi")    ### here SE with same values... not good
+
+#Drop Treatment?
+M4 <- glmmadmb(Dandelion ~ Time, 
+             random =~ 1|fHive, 
+             family="nbinom", data=KW)
+summary(M4)
+drop1(M4, test = "Chi")
+
+
+############################################
+#Step 3: Explain what it all means
+summary(M4)
+#Task: Write down the estimated model
+#
+```
+Plotting
+```{r}
+running predict (output sometimes dont give you the right values, with random components)
+#Sketch the fitted values
+betas   <- fixef(M4)  #betas (the slopes)
+Covbeta <- vcov(M4)   #covariance matrix
+alpha   <- M4$alpha  #= k = size
+k       <- alpha      #(this may be better to avoid confusion) #overdispersion parameter
+#And the random effects
+#a       <-  ranef(M4)$fHive[,'(Intercept)']
+#Re      <- as.numeric(as.factor(KW$fHive))
+
+#Now we can calculate fitted values
+MyData     <- data.frame(Time = c(1,2,3,4))
+X          <- model.matrix(~ Time, data = MyData)
+MyData$eta <- X %*% betas   #the predicted values
+#Try not to plot random variables because that's not the interest of the experiment and doesnt answer the question.
+#The sampling site was chosen at random
+
+#You're plotting the abline because maybe you want to show the continuity across time.
+
+MyData$SE <- sqrt(diag(X %*% Covbeta %*% t(X)))
+MyData
+
+plot(x = KW$Time, 
+     y = KW$Dandelion,
+     xlab = "Time",
+     ylab = "Dandelion")
+lines(x = MyData$Time,
+      y = exp(MyData$eta),
+      lwd = 2)
+
+lines(x = MyData$Time,
+      y = exp(MyData$eta + 1.96 * MyData$SE),
+      lty = 2)
+
+lines(x = MyData$Time,
+      y = exp(MyData$eta - 1.96 * MyData$SE),
+      lty = 2)
+      
+      
+
+      
